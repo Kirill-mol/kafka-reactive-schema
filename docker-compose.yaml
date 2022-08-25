@@ -1,0 +1,54 @@
+version: "3.1"
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.0.1
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "22181:2181"
+    volumes:
+      - zookeeper-data:/usr/share/zookeeper/data
+
+  kafka:
+    container_name: kafka-test
+    image: confluentinc/cp-kafka:7.0.1
+    depends_on:
+      - zookeeper
+    ports:
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    volumes:
+      - kafka-data:/usr/share/kafka/data
+
+  kafka-setup:
+    image: confluentinc/cp-kafka:7.0.1
+    depends_on:
+      - kafka
+    environment:
+      KAFKA_BROKER_ID: ignored
+      KAFKA_ZOOKEEPER_CONNECT: ignored
+    command: "bash -c 'cub kafka-ready -b kafka:9092 1 30 && \
+                         kafka-topics --create --if-not-exists --bootstrap-server kafka:9092 --topic notification --partitions 1 --replication-factor 1'"
+
+  schema:
+    image: confluentinc/cp-schema-registry:5.5.7
+    depends_on:
+      - zookeeper
+    ports:
+      - "28085:8085"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema
+      SCHEMA_REGISTRY_KAFKASTORE_CONNECTION_URL: "zookeeper:2181"
+      SCHEMA_REGISTRY_LISTENERS: "http://0.0.0.0:8085"
+
+volumes:
+  kafka-data:
+  zookeeper-data:
